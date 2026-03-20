@@ -2,7 +2,7 @@
 
 #include <Adafruit_PWMServoDriver.h>
 
-#include "../core/canh_tay_context.h"
+#include "../app_context.h"
 #include "../network/mqtt_fsm.h"
 
 namespace {
@@ -70,16 +70,6 @@ void printAngles() {
 }
 
 void writeServo(int ch, int value) {
-  if (!pca9685Ready) {
-    Serial.printf("[SERVO] Bo qua lenh ch=%d val=%d (PCA9685 chua san sang)\n", ch, value);
-    return;
-  }
-
-  if (ch < 0 || ch > 3) {
-    Serial.printf("[SERVO] Kenh khong hop le: %d\n", ch);
-    return;
-  }
-
   value = constrain(value, 150, 600);
   if (ch == 1 || ch == 2) {
     pwm.setPWM(ch, 0, rev(value));

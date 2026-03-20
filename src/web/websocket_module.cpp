@@ -2,15 +2,15 @@
 
 #include <ArduinoJson.h>
 
-#include "../core/canh_tay_context.h"
-#include "../control/control_module.h"
-#include "../vacuum/vacuum_module.h"
+#include "../app_context.h"
+#include "../dongco/control_module.h"
+#include "../quat_hut/vacuum_module.h"
 #include "../network/mqtt_fsm.h"
 #include "../network/store_forward.h"
 
-void broadcastVacuumState() {
+void broadcastMotorState() {
   JsonDocument doc;
-  doc["type"] = "vacuum";
+  doc["type"] = "motor";
   doc["state"] = vacuumRunning ? "on" : "off";
 
   String out;
@@ -61,7 +61,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
     serializeJson(doc, out);
     webSocket.sendTXT(num, out);
 
-    broadcastVacuumState();
+    broadcastMotorState();
     broadcastTelemetry();
     broadcastQueueStatus();
     return;
@@ -106,13 +106,21 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
     } else if (c == "stop") {
       autoMode = false;
       stopVacuum();
-      sendCmdToVehicle(0, 0, 0, true);
-      broadcastVacuumState();
+      sendCmdToVehicle(0, 0, true);
+      broadcastMotorState();
     } else if (c == "cut") {
-      autoMode = false;
-      writeServo(3, 510);
-      delay(250);
-      writeServo(3, 410);
+      if (cepProcess("cut")) {
+        vacuumRunning ? stopVacuum() : startVacuumSafe();
+        broadcastMotorState();
+      } else {
+        JsonDocument nd;
+        nd["type"] = "alert";
+        nd["msg"] = "Nhan CAT lan 2 de xac nhan (trong 3s)";
+        nd["level"] = "info";
+        String no;
+        serializeJson(nd, no);
+        webSocket.sendTXT(num, no);
+      }
     }
 
     mqttPublishStatus();
@@ -120,11 +128,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
   }
 
   if (t == "vehicle") {
-    sendCmdToVehicle(
-      doc["speed"] | 0,
-      doc["direction"] | 0,
-      doc["lift"] | 0,
-      doc["stop"] | false
-    );
+    sendCmdToVehicle(doc["speed"] | 0, doc["direction"] | 0, doc["stop"] | false);
   }
 }

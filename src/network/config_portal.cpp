@@ -5,54 +5,27 @@
 #include <WebServer.h>
 #include <WiFi.h>
 
-#include "../ui/web_content.h"
+#include "../web/web_content.h"
 
 namespace {
 Preferences prefs;
 DNSServer dnsServer;
 WebServer portalServer(80);
 const byte DNS_PORT = 53;
-
-const char *DEFAULT_WIFI_SSID = "Nhà 15 Trinh Lương";
-const char *DEFAULT_WIFI_PASS = "88888888";
-const char *DEFAULT_MQTT_SERVER = "192.168.100.248";
-const int DEFAULT_MQTT_PORT = 1884;
-const bool FORCE_DEFAULT_CONFIG = true;
 }
 
 WifiConfig wifiCfg;
 bool portalMode = false;
 
 bool loadConfig() {
-  bool opened = prefs.begin("robot-cfg", true);
-  if (opened) {
-    wifiCfg.ssid = prefs.getString("ssid", "");
-    wifiCfg.password = prefs.getString("pass", "");
-    wifiCfg.mqttServer = prefs.getString("mqtt_ip", DEFAULT_MQTT_SERVER);
-    wifiCfg.mqttPort = prefs.getInt("mqtt_port", DEFAULT_MQTT_PORT);
-    prefs.end();
-  } else {
-    wifiCfg.ssid = "";
-    wifiCfg.password = "";
-    wifiCfg.mqttServer = DEFAULT_MQTT_SERVER;
-    wifiCfg.mqttPort = DEFAULT_MQTT_PORT;
-  }
+  prefs.begin("robot-cfg", true);
+  wifiCfg.ssid       = prefs.getString("ssid", "");
+  wifiCfg.password   = prefs.getString("pass", "");
+  wifiCfg.mqttServer = prefs.getString("mqtt_ip", "192.168.100.101");
+  wifiCfg.mqttPort   = prefs.getInt("mqtt_port", 1883);
+  prefs.end();
 
-  // Force defaults when required, otherwise fallback only when values are missing.
-  if (FORCE_DEFAULT_CONFIG || wifiCfg.ssid.length() == 0) {
-    wifiCfg.ssid = DEFAULT_WIFI_SSID;
-  }
-  if (FORCE_DEFAULT_CONFIG || wifiCfg.password.length() == 0) {
-    wifiCfg.password = DEFAULT_WIFI_PASS;
-  }
-  if (FORCE_DEFAULT_CONFIG || wifiCfg.mqttServer.length() == 0) {
-    wifiCfg.mqttServer = DEFAULT_MQTT_SERVER;
-  }
-  if (FORCE_DEFAULT_CONFIG || wifiCfg.mqttPort <= 0) {
-    wifiCfg.mqttPort = DEFAULT_MQTT_PORT;
-  }
-
-  bool valid = (wifiCfg.ssid.length() > 0 && wifiCfg.password.length() > 0 && wifiCfg.mqttServer.length() > 0);
+  bool valid = (wifiCfg.ssid.length() > 0 && wifiCfg.password.length() > 0);
   Serial.printf("[CFG] SSID='%s' MQTT='%s:%d' valid=%d\n",
                 wifiCfg.ssid.c_str(), wifiCfg.mqttServer.c_str(), wifiCfg.mqttPort, valid);
   return valid;
@@ -127,7 +100,7 @@ void startCaptivePortal() {
     }
 
     if (mqttPort <= 0) {
-      mqttPort = DEFAULT_MQTT_PORT;
+      mqttPort = 1883;
     }
 
     if (saveConfigAtomic(ssid, pass, mqttIp, mqttPort)) {

@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include "arm/core/canh_tay.h"
+#include "canh_tay/canh_tay.h"
 
 void setup() {
   initCanhTay();

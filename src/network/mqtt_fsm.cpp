@@ -2,12 +2,12 @@
 
 #include <ArduinoJson.h>
 
-#include "../core/canh_tay_context.h"
+#include "../app_context.h"
 #include "config_portal.h"
-#include "../control/control_module.h"
-#include "../vacuum/vacuum_module.h"
+#include "../dongco/control_module.h"
+#include "../quat_hut/vacuum_module.h"
 #include "store_forward.h"
-#include "../ui/websocket_module.h"
+#include "../web/websocket_module.h"
 
 namespace {
 const unsigned long BACKOFF_BASE_MS = 2000;
@@ -16,8 +16,6 @@ const unsigned long BACKOFF_MAX_MS = 30000;
 MqttFsmState mqttFsmState = ROBOT_MQTT_DISCONNECTED;
 int backoffRetryCount = 0;
 unsigned long backoffUntil = 0;
-bool servoCommandSubscribed = false;
-unsigned long lastSubAttemptMs = 0;
 
 unsigned long calcBackoff() {
   unsigned long delay = BACKOFF_BASE_MS;
@@ -48,7 +46,7 @@ void mqttPublishSafe(const char *topic, const String &payload) {
 
 void mqttPublishStatus() {
   JsonDocument doc;
-  doc["vacuum"] = vacuumRunning ? "on" : "off";
+  doc["motor"] = vacuumRunning ? "on" : "off";
   doc["autoMode"] = autoMode;
 
   JsonArray arr = doc["servo"].to<JsonArray>();
@@ -70,33 +68,27 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
     msg += (char)payload[i];
   }
 
-  Serial.printf("[MQTT] RX topic=%s payload=%s\n", topic, msg.c_str());
-
   JsonDocument doc;
   if (deserializeJson(doc, msg)) {
-    int ch = -1;
-    int val = -1;
-    char cmdBuf[16] = {0};
-    if (sscanf(msg.c_str(), "{cmd:%15[^,],ch:%d,val:%d}", cmdBuf, &ch, &val) == 3) {
-      doc["cmd"] = String(cmdBuf);
-      doc["ch"] = ch;
-      doc["val"] = val;
-      Serial.printf("[MQTT] RX fallback parse OK cmd=%s ch=%d val=%d\n", cmdBuf, ch, val);
-    } else {
-      Serial.println("[MQTT] RX parse JSON FAIL");
-      return;
-    }
+    return;
   }
 
   String cmd = doc["cmd"].as<String>();
 
   if (cmd == "cut") {
-    // PCA9685 setup: cut action is a quick close/open on gripper servo (CH3).
-    autoMode = false;
-    writeServo(3, 510);
-    delay(250);
-    writeServo(3, 410);
-    mqttPublishStatus();
+    if (cepProcess("cut")) {
+      vacuumRunning ? stopVacuum() : startVacuumSafe();
+      broadcastMotorState();
+      mqttPublishStatus();
+    } else {
+      JsonDocument nd;
+      nd["type"] = "alert";
+      nd["msg"] = "Gui lenh CAT lan 2 de xac nhan (trong 3s)";
+      nd["level"] = "info";
+      String no;
+      serializeJson(nd, no);
+      webSocket.broadcastTXT(no);
+    }
   } else if (cmd == "auto") {
     if (cepProcess("auto")) {
       resetAuto = true;
@@ -114,8 +106,8 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
   } else if (cmd == "stop") {
     autoMode = false;
     stopVacuum();
-    sendCmdToVehicle(0, 0, 0, true);
-    broadcastVacuumState();
+    sendCmdToVehicle(0, 0, true);
+    broadcastMotorState();
     mqttPublishStatus();
   } else if (cmd == "home") {
     autoMode = false;
@@ -125,18 +117,10 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
     writeServo(3, 410);
     mqttPublishStatus();
   } else if (cmd == "servo") {
-    int ch = doc["ch"] | -1;
-    int val = doc["val"] | -1;
-    Serial.printf("[MQTT] CMD servo ch=%d val=%d\n", ch, val);
-    writeServo(ch, val);
+    writeServo(doc["ch"], doc["val"]);
     mqttPublishStatus();
   } else if (cmd == "vehicle") {
-    sendCmdToVehicle(
-      doc["speed"] | 0,
-      doc["direction"] | 0,
-      doc["lift"] | 0,
-      doc["stop"] | false
-    );
+    sendCmdToVehicle(doc["speed"] | 0, doc["direction"] | 0, doc["stop"] | false);
   }
 }
 
@@ -159,13 +143,10 @@ void mqttFsmTick() {
         mqttFsmState = ROBOT_MQTT_CONNECTED;
         backoffRetryCount = 0;
         backoffUntil = 0;
-        servoCommandSubscribed = false;
 
-        servoCommandSubscribed = mqtt.subscribe("servo/command");
-        lastSubAttemptMs = now;
+        mqtt.subscribe("servo/command");
         Serial.println("[FSM] CONNECTING -> CONNECTED");
         Serial.printf("[FSM] Client: %s\n", clientId.c_str());
-        Serial.printf("[FSM] Subscribe servo/command: %s\n", servoCommandSubscribed ? "OK" : "FAIL");
 
         mqttPublishStatus();
 
@@ -193,7 +174,6 @@ void mqttFsmTick() {
     case ROBOT_MQTT_CONNECTED:
       if (!mqtt.connected()) {
         mqttFsmState = ROBOT_MQTT_DISCONNECTED;
-        servoCommandSubscribed = false;
         backoffUntil = millis() + calcBackoff();
         Serial.println("[FSM] CONNECTED -> DISCONNECTED");
 
@@ -204,10 +184,6 @@ void mqttFsmTick() {
         String no;
         serializeJson(nd, no);
         webSocket.broadcastTXT(no);
-      } else if (!servoCommandSubscribed && now - lastSubAttemptMs >= 5000) {
-        servoCommandSubscribed = mqtt.subscribe("servo/command");
-        lastSubAttemptMs = now;
-        Serial.printf("[FSM] Retry subscribe servo/command: %s\n", servoCommandSubscribed ? "OK" : "FAIL");
       }
       break;
 

@@ -1,16 +1,23 @@
 #include <Arduino.h>
 #include <esp_now.h>
 #include <WiFi.h>
-#include <esp_wifi.h>
 #include "xe_espnow.h"
-#include "../../shared/robot_protocol.h"
 
-uint8_t gatewayMAC[] = {0x30, 0xC6, 0xF7, 0x30, 0x79, 0xCC};
-const uint8_t ESPNOW_CHANNEL = 6;
+uint8_t gatewayMAC[] = {0xF0, 0x24, 0xF9, 0x45, 0xBE, 0xD4};
+
+typedef struct {
+  float pitch, roll;
+  int curA, curB, curC, curD, curE;
+  bool isBalanced;
+} TelemetryPacket;
+
+typedef struct {
+  int speed, direction;
+  bool stop;
+} CmdPacket;
 
 int latestCmd_speed = 0;
 int latestCmd_direction = 0;
-int latestCmd_lift = 0;
 bool latestCmd_stop = true;
 unsigned long lastCmdTime = 0;
 unsigned long lastTelemetry = 0;
@@ -23,7 +30,6 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *data, int len) {
   
   latestCmd_speed = cmd.speed;
   latestCmd_direction = cmd.direction;
-  latestCmd_lift = cmd.lift;
   latestCmd_stop = cmd.stop;
   lastCmdTime = millis();
   
@@ -32,20 +38,16 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *data, int len) {
 
 void initESPNow() {
   WiFi.mode(WIFI_STA);
-  esp_wifi_set_promiscuous(true);
-  esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
-  esp_wifi_set_promiscuous(false);
-
   esp_now_init();
   esp_now_register_recv_cb(OnDataRecv);
 
   esp_now_peer_info_t peer = {};
   memcpy(peer.peer_addr, gatewayMAC, 6);
-  peer.channel = ESPNOW_CHANNEL;
+  peer.channel = 0;
   peer.encrypt = false;
   esp_now_add_peer(&peer);
 
-  Serial.printf("[ESP-NOW] Node san sang (channel=%u)\n", ESPNOW_CHANNEL);
+  Serial.println("[ESP-NOW] Node san sang");
 }
 
 void sendTelemetry() {

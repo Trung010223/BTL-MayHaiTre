@@ -2,9 +2,9 @@
 
 #include <ArduinoJson.h>
 
-#include "../core/canh_tay_context.h"
+#include "../app_context.h"
 #include "../network/mqtt_fsm.h"
-#include "../ui/websocket_module.h"
+#include "../web/websocket_module.h"
 
 namespace {
 #define VACUUM_IN1 25
@@ -53,7 +53,7 @@ void checkVacuumFailsafe() {
 
   if (millis() - vacuumStartTime >= MAX_VACUUM_RUNTIME) {
     stopVacuum();
-    broadcastVacuumState();
+    broadcastMotorState();
     mqttPublishStatus();
     Serial.println("[FAILSAFE] Quat hut qua 5 phut -> TAT!");
 

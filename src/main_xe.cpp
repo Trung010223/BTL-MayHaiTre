@@ -1,9 +1,7 @@
 #include <Arduino.h>
-#include "vehicle/core/xe.h"
+#include "xe/xe.h"
 
 void setup() {
-  Serial.begin(115200);
-  delay(200);
   initXe();
 }
 
