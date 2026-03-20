@@ -2,7 +2,7 @@
 
 #include <WebSocketsServer.h>
 
-void broadcastMotorState();
+void broadcastVacuumState();
 void broadcastTelemetry();
 void broadcastQueueStatus();
 

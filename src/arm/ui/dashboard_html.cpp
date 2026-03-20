@@ -83,8 +83,8 @@ const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
   <div class="panel grid-full">
     <div class="panel-title">◈ ROBOT ARM</div>
     <div class="motor-status-row">
-      <span class="ms-label">⚙ Quạt hút (Motor)</span>
-      <span class="ms-badge off" id="motorBadge">⛔ TẮT</span>
+      <span class="ms-label">⚙ Quạt hút (Vacuum)</span>
+      <span class="ms-badge off" id="vacuumBadge">⛔ TẮT</span>
     </div>
     <div class="servo-list">
       <div class="servo-row"><div class="servo-header"><span class="servo-name">🔄 Base (Xoay đế)</span><span class="servo-deg" id="v0">0°</span></div><input type="range" class="servo-slider" id="s0" min="150" max="600" value="330" oninput="sendServo(0,this.value)"></div>

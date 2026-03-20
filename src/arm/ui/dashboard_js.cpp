@@ -25,8 +25,8 @@ function connect() {
         document.getElementById('v'+i).textContent = pwmToDeg(v)+'°';
       });
     }
-    if (d.type === 'motor') {
-      const badge = document.getElementById('motorBadge');
+    if (d.type === 'vacuum') {
+      const badge = document.getElementById('vacuumBadge');
       const btn   = document.getElementById('btnCut');
       if (d.state === 'on') {
         badge.textContent='✅ ĐANG CHẠY'; badge.className='ms-badge on';
@@ -117,7 +117,7 @@ function drawTilt(pitch, roll) {
   ctx.beginPath();
   ctx.moveTo(cx-lineLen*Math.cos(ang), cy-lineLen*Math.sin(ang)+clampedDy*0.5);
   ctx.lineTo(cx+lineLen*Math.cos(ang), cy+lineLen*Math.sin(ang)+clampedDy*0.5);
-  const balanced = Math.abs(pitch)<3 && Math.abs(roll)<3;
+  const balanced = Math.abs(pitch) <= 2 && Math.abs(roll) <= 2;
   ctx.strokeStyle = balanced?'#00ff88':(Math.abs(pitch)>20||Math.abs(roll)>20?'#ff3355':'#ffd700');
   ctx.lineWidth=2; ctx.stroke();
   ctx.beginPath(); ctx.arc(cx+clampedDx, cy+clampedDy, 5, 0, Math.PI*2);
